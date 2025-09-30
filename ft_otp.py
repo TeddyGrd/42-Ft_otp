@@ -1,7 +1,16 @@
 #!/usr/bin/env python3
 import argparse
 from pathlib import Path
-import hmac, hashlib, time, struct
+import hmac, hashlib, time, struct, qrcode, base64
+
+def generate_qrcode(key: bytes, label: str = "ft_otp:user@example.com", issuer: str="ft_otp"):
+    secret_b32 = base64.b32encode(key).decode("utf-8").replace("=","")
+    uri = f"otpauth://totp/{label}?secret={secret_b32}&issuer={issuer}&algorithm=SHA1&digits=6&period=30"
+
+    img = qrcode.make(uri)
+    img.save("ft_otp.png")
+    print("QR code enregistre dans ft_otp.png")
+    print("URI :", uri)
 
 def xor_data(data: bytes, password: str) -> bytes:
     pwd_bytes = password.encode()
@@ -28,6 +37,7 @@ def main():
     group.add_argument("-g", dest="hexfile", metavar="HEXFILE", help="Cle hexadecimal pour generer le fichier ft_otp.key")
     group.add_argument("-k", dest="keyfile", metavar="KEYFILE", help="Chemin vers le fichier chiffre" )
     parser.add_argument("-p", dest="password",metavar="PASSWORD", help="Mots de passe pour chiffrer/dechiffrer la cle" )
+    parser.add_argument("--qrcode",action="store_true", help="creation d un qrcode pour google authenticator" )
     args = parser.parse_args()
 
     if args.hexfile:
@@ -84,6 +94,8 @@ def main():
             preview = preview[:32] + "..."
         print(f"    - apercu : {preview}")
         otp = generate_totp(cle, digits=6, period=30)
+        if args.qrcode:
+            generate_qrcode(cle, label=args.qrcode, issuer="ft_otp")
         print(f"\nOTP : {otp}")
 
 if __name__ == "__main__":
