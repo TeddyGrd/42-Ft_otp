@@ -15,18 +15,29 @@ def generate_qrcode(key: bytes, label: str = "ft_otp:user@example.com", issuer: 
 def xor_data(data: bytes, password: str) -> bytes:
     pwd_bytes = password.encode()
     pwd_len = len(pwd_bytes)
-    return bytes([b ^ pwd_bytes[i % pwd_len] for i , b in enumerate(data)])
+    result = bytearray()
+
+    for i, b in enumerate(data):
+        key_byte = pwd_bytes[i % pwd_len]
+        xored_byte = b ^ key_byte
+        result.append(xored_byte)
+    return bytes(result)
+
 
 def generate_totp(key: bytes, digits: int = 6, period: int = 30, now: float | None = None) -> str:
     if now is None:
         now = time.time()
     counter = int(now // period)
+    # on convertie le compteur en 8 octets format big endian pour la RFC)
     counter_bytes = struct.pack(">Q", counter)
 
+    # HMAC-SHA1 de la clé et du compteur
     hmac_digest = hmac.new(key, counter_bytes, hashlib.sha1).digest()
+    # recupere les 4 bits faibles du dernier octet
     offset = hmac_digest[-1] & 0x0f
+    # extrait 4 octets (dynamic truncation RFC 4226)
     part = hmac_digest[offset:offset + 4]
-
+    # Combine ces 4 octets en un entier 31 bits (bit de signe a 0)
     code = ((part[0] & 0x7F) << 24) | ((part[1] & 0xFF) << 16) | ((part[2] & 0xFF) << 8) | ((part[3] & 0xFF))
     otp = code % (10 ** digits)
     return str(otp).zfill(digits)
